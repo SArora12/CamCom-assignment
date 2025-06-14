@@ -1,13 +1,3 @@
-Of course. Here is an updated and improved version of your README for the QC Auto-Assignment Service.
-
-The key improvements focus on making the system more robust and production-ready by:
-
-1.  **Explicitly defining a heartbeat mechanism** to handle users who close their browser or lose connection.
-2.  **Detailing a transaction-safe, locking-based approach** in the scheduler to prevent race conditions.
-3.  **Refining the API endpoints** and workflow descriptions for better clarity.
-
----
-
 # **README: QC Auto-Assignment Service**
 
 ## **Overview**
