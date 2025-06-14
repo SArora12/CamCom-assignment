@@ -7,22 +7,22 @@ import { puzzle } from "./puzzle";
 
 export default function App() {
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
-  const [direction, setDirection] = useState("across"); // "across" or "down"
+  const [direction, setDirection] = useState("across");
   const [entries, setEntries] = useState(
     Array(puzzle.rows)
       .fill()
       .map(() => Array(puzzle.cols).fill(""))
+  );
+  const [feedback, setFeedback] = useState(
+    Array(puzzle.rows)
+      .fill()
+      .map(() => Array(puzzle.cols).fill(null))
   );
   const [activeClue, setActiveClue] = useState({
     direction: "across",
     number: 1,
   });
 
-  const [feedback, setFeedback] = useState(
-    Array(puzzle.rows)
-      .fill()
-      .map(() => Array(puzzle.cols).fill(null))
-  );
   function handleReveal() {
     const newEntries = puzzle.grid.map((row) =>
       row.map((cell) =>
@@ -30,7 +30,6 @@ export default function App() {
       )
     );
     setEntries(newEntries);
-    // Optionally, reset feedback
     setFeedback(
       Array(puzzle.rows)
         .fill()
@@ -38,17 +37,6 @@ export default function App() {
     );
   }
 
-  function handleCheck() {
-    const newFeedback = puzzle.grid.map((row, r) =>
-      row.map((cell, c) => {
-        if (!cell || cell.isBlack) return null;
-        if (!entries[r][c]) return null;
-        if (entries[r][c].toUpperCase() === cell.solution) return "correct";
-        return "wrong";
-      })
-    );
-    setFeedback(newFeedback);
-  }
   function handleClear() {
     setEntries(
       Array(puzzle.rows)
@@ -62,10 +50,25 @@ export default function App() {
     );
   }
 
+  // ------ NEW: handleCheck ------
+  function handleCheck() {
+    const newFeedback = puzzle.grid.map((row, rIdx) =>
+      row.map((cell, cIdx) => {
+        if (!cell || cell.isBlack || !cell.solution) return null;
+        if (!entries[rIdx][cIdx]) return null; // Not filled yet
+        return entries[rIdx][cIdx].toUpperCase() === cell.solution.toUpperCase()
+          ? "correct"
+          : "incorrect";
+      })
+    );
+    setFeedback(newFeedback);
+  }
+  // -----------------------------
+
   return (
-    <div className="app-container">
-      <h2>Mini Crossword</h2>
-      <div className="crossword-wrapper">
+    <div className="app-main">
+      <div className="crossword-main-panel">
+        <h2 className="title">Mini Crossword</h2>
         <CrosswordGrid
           puzzle={puzzle}
           entries={entries}
@@ -75,7 +78,15 @@ export default function App() {
           direction={direction}
           setDirection={setDirection}
           setActiveClue={setActiveClue}
+          feedback={feedback}
         />
+        <Controls
+          onReveal={handleReveal}
+          onCheck={handleCheck}
+          onClear={handleClear}
+        />
+      </div>
+      <div className="clue-panel-2col">
         <ClueList
           puzzle={puzzle}
           activeClue={activeClue}
@@ -84,11 +95,6 @@ export default function App() {
           setSelectedCell={setSelectedCell}
         />
       </div>
-      <Controls
-        onReveal={handleReveal}
-        onCheck={handleCheck}
-        onClear={handleClear}
-      />
     </div>
   );
 }

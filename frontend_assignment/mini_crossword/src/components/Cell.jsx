@@ -4,6 +4,7 @@ export default function Cell({
   cell,
   value,
   isSelected,
+  feedback, // <-- Accept feedback
   onClick,
   onKeyDown,
   row,
@@ -21,12 +22,14 @@ export default function Cell({
     return <div className="cell black"></div>;
   }
 
+  // Add classes for feedback
+  let classNames = "cell";
+  if (isSelected) classNames += " selected";
+  if (feedback === "correct") classNames += " correct";
+  else if (feedback === "incorrect") classNames += " incorrect";
+
   return (
-    <div
-      className={`cell${isSelected ? " selected" : ""}`}
-      onClick={onClick}
-      tabIndex={0}
-    >
+    <div className={classNames} onClick={onClick} tabIndex={0}>
       {cell.number && <span className="cell-number">{cell.number}</span>}
       <input
         ref={inputRef}

@@ -9,6 +9,7 @@ export default function CrosswordGrid({
   direction,
   setDirection,
   setActiveClue,
+  feedback, // <-- Accept feedback
 }) {
   const handleKeyDown = (e, row, col) => {
     if (!/^[a-zA-Z]$/.test(e.key)) return;
@@ -17,7 +18,6 @@ export default function CrosswordGrid({
     newEntries[row][col] = val;
     setEntries(newEntries);
 
-    // Move to next cell
     if (direction === "across") setSelectedCell({ row, col: col + 1 });
     else setSelectedCell({ row: row + 1, col });
   };
@@ -36,6 +36,7 @@ export default function CrosswordGrid({
               isSelected={
                 selectedCell.row === rowIdx && selectedCell.col === colIdx
               }
+              feedback={feedback?.[rowIdx]?.[colIdx] || null} // <-- NEW
               onClick={() => setSelectedCell({ row: rowIdx, col: colIdx })}
               onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
             />

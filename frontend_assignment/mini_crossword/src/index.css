@@ -1,72 +1,265 @@
-.app-container {
+/* index.css */
+
+/* Overall layout */
+.app-main {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  background: #f6f6f6;
+}
+
+.crossword-main-panel {
+  margin: 48px 32px 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-.crossword-wrapper {
-  display: flex;
-  flex-direction: row;
+
+.title {
+  font-family: "Georgia", serif;
+  font-size: 2rem;
+  margin-bottom: 20px;
 }
+
 .grid {
-  display: flex;
-  flex-direction: column;
-  margin: 20px;
+  display: inline-block;
+  background: #222;
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.07);
 }
+
 .grid-row {
   display: flex;
 }
+
 .cell {
-  width: 40px;
-  height: 40px;
-  border: 1px solid #888;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1.5px solid #bdbdbd;
   background: #fff;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  box-sizing: border-box;
+  transition: border 0.15s, box-shadow 0.15s;
 }
-.cell.selected {
-  background: #ffe066;
-  border: 2px solid #faa307;
-}
+
 .cell.black {
-  background: #222;
-  border: 1px solid #222;
+  background: #111;
+  border: 1.5px solid #111;
 }
-.cell-number {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  font-size: 0.7em;
-  color: #555;
+
+.cell.selected {
+  background: #ffe066 !important;
+  z-index: 2;
 }
+
 .cell-input {
   width: 100%;
   height: 100%;
   border: none;
+  font-size: 1.5rem;
+  font-weight: 700;
   text-align: center;
-  font-size: 1.5em;
   background: transparent;
-}
-.clue-list {
-  width: 350px;
-  font-size: 1.1em;
-}
-.clue-list ul {
-  list-style: none;
-  padding: 0;
-}
-.clue-list li {
+  outline: none;
+  color: #222;
   cursor: pointer;
-  padding: 3px 0;
 }
-.clue-list li.active {
-  background: #e3f2fd;
-  font-weight: bold;
+
+.cell-number {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: #757575;
+  pointer-events: none;
 }
+
+.cell.correct {
+  background: #c6f7d0;
+  border: 2px solid #27ae60;
+}
+
+.cell.incorrect {
+  background: #ffd6d6;
+  border: 2px solid #c0392b;
+}
+
+.clue-panel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.04);
+  min-width: 300px;
+  max-width: 340px;
+  margin-top: 48px;
+  padding: 24px 18px 24px 24px;
+  height: 570px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.clue-list {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: hidden;
+}
+
+.clue-section {
+  flex: 1 1 0;
+  overflow-y: auto;
+}
+
+.clue-header {
+  background: #f2f7fb;
+  font-weight: 700;
+  color: #1976d2;
+  font-size: 1rem;
+  padding: 6px 0 6px 2px;
+  margin-bottom: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.clue {
+  padding: 6px 0 6px 8px;
+  font-size: 1.07rem;
+  line-height: 1.4;
+  border-radius: 5px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.13s;
+}
+
+.clue.active {
+  background: #e3f1fc;
+  color: #0055bb;
+  font-weight: 700;
+}
+
+/* Controls Styling */
 .controls {
-  margin-top: 20px;
+  display: flex;
+  gap: 15px;
+  margin: 22px 0 0 0;
 }
+
 .controls button {
-  margin: 0 5px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  padding: 8px 22px;
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.07);
+  transition: background 0.13s;
+}
+
+.controls button:hover {
+  background: #1565c0;
+}
+/* Add this after your .controls styles or at the bottom */
+
+/* --- Clue Panel: 2 Columns --- */
+.clue-panel-2col {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.04);
+  min-width: 440px;
+  max-width: 550px;
+  margin-top: 48px;
+  padding: 24px 12px 24px 24px;
+  height: 570px;
+  display: flex;
+  flex-direction: row;
+  gap: 18px;
+  /* Make sure it doesn’t shrink on small screens */
+  min-height: 360px;
+}
+
+.clue-list-2col {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  gap: 14px;
+}
+
+.clue-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  overflow-y: auto;
+  border-radius: 6px;
+  background: #fcfcfd;
+  box-shadow: 0 1px 6px rgba(50, 100, 200, 0.03);
+  padding: 0 8px 0 0;
+}
+
+.clue-header {
+  background: #f2f7fb;
+  font-weight: 700;
+  color: #1976d2;
+  font-size: 1rem;
+  padding: 6px 0 6px 2px;
+  margin-bottom: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-radius: 6px 6px 0 0;
+}
+
+.clue {
+  padding: 6px 0 6px 8px;
+  font-size: 1.07rem;
+  line-height: 1.4;
+  border-radius: 5px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.13s;
+}
+
+.clue.active {
+  background: #e3f1fc;
+  color: #0055bb;
+  font-weight: 700;
+}
+
+/* Responsive: Stack on very small screens */
+@media (max-width: 750px) {
+  .app-main {
+    flex-direction: column;
+    align-items: center;
+  }
+  .clue-panel-2col {
+    flex-direction: column;
+    min-width: 260px;
+    max-width: 96vw;
+    height: auto;
+    margin: 24px 0 0 0;
+    padding: 20px 8px 20px 12px;
+    gap: 12px;
+  }
+  .clue-list-2col {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .clue-col {
+    min-height: 200px;
+    max-height: 220px;
+    padding: 0 4px 0 0;
+  }
 }
