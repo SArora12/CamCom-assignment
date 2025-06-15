@@ -4,32 +4,24 @@ export default function Cell({
   cell,
   value,
   isSelected,
-  feedback, // <-- Accept feedback
+  feedback,
   onClick,
   onKeyDown,
-  row,
-  col,
 }) {
   const inputRef = useRef();
 
   useEffect(() => {
-    if (isSelected && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (isSelected && inputRef.current) inputRef.current.focus();
   }, [isSelected]);
 
-  if (cell.isBlack) {
-    return <div className="cell black"></div>;
-  }
+  if (cell.isBlack) return <div className="cell black"></div>;
 
-  // Add classes for feedback
   let classNames = "cell";
   if (isSelected) classNames += " selected";
-  if (feedback === "correct") classNames += " correct";
-  else if (feedback === "incorrect") classNames += " incorrect";
+  if (feedback) classNames += ` ${feedback}`;
 
   return (
-    <div className={classNames} onClick={onClick} tabIndex={0}>
+    <div className={classNames} onClick={onClick}>
       {cell.number && <span className="cell-number">{cell.number}</span>}
       <input
         ref={inputRef}
@@ -37,9 +29,8 @@ export default function Cell({
         type="text"
         maxLength={1}
         value={value}
-        onChange={() => {}} // handled onKeyDown
+        onChange={() => {}}
         onKeyDown={onKeyDown}
-        tabIndex={-1}
         autoComplete="off"
       />
     </div>

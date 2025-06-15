@@ -10,6 +10,34 @@
 
 ---
 
+## My Approach and Thought Process
+
+**1. Deconstructing the Requirements:**
+First, I identified the core requirements from the problem description:
+
+- A Python class named `NearNeighborRemover`.
+- An initializer that accepts a `distance_threshold`.
+- A method to calculate the Euclidean distance between two points.
+- A primary method to filter a list of points based on their distance from the _previously kept point_, not just their immediate predecessor in the input list.
+
+**2. Designing the Core Algorithm:**
+My main focus was on the filtering logic. The key was to maintain a separate list of points that have passed the filter, as the distance check is always against the last member of this valid list. The algorithm is as follows:
+
+- If the input list is empty, return an empty list immediately.
+- Create a new list, `filtered_points`, and initialize it with the very first point from the input. This point is always included as it has no predecessor to be compared against.
+- Iterate through the original `points` list, starting from the second point.
+- For each `current_point`, calculate its Euclidean distance to the last point in our `filtered_points` list (`filtered_points[-1]`).
+- If the calculated distance is greater than or equal to the `distance_threshold`, append the `current_point` to `filtered_points`. Otherwise, discard it.
+- Once the loop is complete, `filtered_points` holds the desired result.
+
+**3. Choosing the Right Tools:**
+For the distance calculation, I chose `math.hypot(dx, dy)`. While `math.sqrt(dx**2 + dy**2)` also works, `math.hypot` is generally preferred as it provides better numerical stability and avoids potential overflow issues when dealing with very large coordinate values.
+
+**4. Encapsulation and Verification:**
+Finally, I encapsulated all the logic within the `NearNeighborRemover` class as required. To ensure correctness, I created a self-verifying script within the `if __name__ == "__main__":` block. This script instantiates the class, runs the filtering process on the provided data, and uses an `assert` statement to confirm that the output exactly matches the expected result given in the problem description. This makes the solution runnable and instantly verifiable.
+
+---
+
 ## Directory Structure
 
 ```
@@ -34,7 +62,8 @@ No external dependencies beyond the standard library.
 Clone the repo and install (if needed) in a virtual environment:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/SArora12/CamCom-assignment.git
+cd backend_assignment
 cd near_neighbor
 ```
 

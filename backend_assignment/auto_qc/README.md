@@ -1,265 +1,160 @@
-# QC Auto-Assignment Service
+# **QC Auto-Assignment Service**
 
-## Overview
+## **Overview**
 
-This project implements an automated QC (Quality Control) task assignment system using **FastAPI**, **MySQL**, and a background scheduler. It replaces a manual portal by:
+This document outlines the architecture for an automated Quality Control (QC) task assignment system. Designed with Python, FastAPI, and MySQL, it replaces a manual assignment portal by intelligently distributing tasks to available personnel.
 
-1. Tracking logged-in QC personnel and their status (free or busy).
-2. Automatically assigning pending QC tasks to available personnel.
-3. Re-assigning new tasks immediately upon task completion.
+The system's core responsibilities are:
 
-Key components:
-
-- **API Layer**: FastAPI endpoints for login/logout, task creation/completion, and status queries.
-- **Database**: MySQL schema for `qc_person`, `qc_task`, and `assignment` records.
-- **Scheduler**: Background job running every few seconds to match free personnel with pending tasks.
+- Tracking the real-time status of QC personnel (logged-in, free, or busy).
+- Maintaining a queue of pending QC tasks.
+- Automatically assigning pending tasks to the next available QC person.
+- Ensuring a continuous workflow by assigning a new task as soon as a previous one is finished.
 
 ---
 
-## Table of Contents
+## My Approach and Thought Process
 
-1. [Directory Structure](#directory-structure)
-2. [Requirements](#requirements)
-3. [Installation](#installation)
-4. [Database Schema](#database-schema)
-5. [Methodology](#methodology)
-6. [Application Architecture](#application-architecture)
-7. [API Endpoints](#api-endpoints)
-8. [Scheduler Workflow](#scheduler-workflow)
-9. [Usage Examples](#usage-examples)
-10. [Extensibility & Production Considerations](#extensibility--production-considerations)
-11. [License](#license)
+My approach to designing this system was to start from the core user story and build outwards, focusing on creating a robust and scalable architecture that anticipates real-world challenges.
 
----
+**1. Deconstructing the Problem and Core Entities:**
+I began by analyzing the process flow described in the requirements. This revealed two primary entities:
 
-## Directory Structure
+- **QC Personnel:** Users who can be in various states: logged-in/logged-out, and free/busy.
+- **QC Tasks:** Work items that move through a lifecycle: pending -> in-progress -> completed.
+  This naturally led to the database schema with distinct tables for `qc_personnel` and `qc_tasks`. I added a third table, `qc_assignments`, to serve as an immutable audit log, which is a best practice for traceability.
 
-```
-qc_auto_assignment/
-├── app.py                  # FastAPI application and endpoints
-├── database.py             # MySQL connection and ORM models
-├── scheduler.py            # Background task assignment logic
-├── requirements.txt        # Python dependencies
-└── README_qc_auto_assignment.md  # This document
-```
+**2. Choosing the Right Architectural Pattern:**
+A simple, monolithic application would be insufficient here. The task assignment logic could be slow or complex and should not impact the responsiveness of the user-facing API. Therefore, I chose a **decoupled, three-component architecture**:
 
----
+1.  **API Server (FastAPI):** Handles direct, stateless interactions from the client.
+2.  **Database (MySQL):** Acts as the single source of truth for all system state.
+3.  **Background Scheduler:** Runs the stateful, complex assignment logic independently.
+    This separation of concerns is key to building a scalable and maintainable system.
 
-## Requirements
+**3. Designing for Real-World Scenarios (Handling Edge Cases):**
+I also identified two major potential points of failure:
 
-- Python 3.8+
-- MySQL Server
-- Python packages:
+- **The "Stale Session" Problem:** What if a user closes their browser without logging out? A task could be permanently stuck with them. My solution is the **heartbeat mechanism**. The client periodically pings the server to say "I'm still here." The scheduler has a cleanup job that automatically logs out any user whose heartbeat has gone silent, releasing their assigned task back into the queue.
+- **The "Race Condition" Problem:** What if two scheduler processes run at the exact same time? They might try to assign the same task to two different people. My solution is to handle assignments within a **database transaction using pessimistic locking**. By using `SELECT ... FOR UPDATE`, I instruct the database to lock the selected "person" and "task" rows. No other process can touch these rows until the transaction is committed or rolled back. This guarantees that every assignment is atomic and safe, even under high load.
 
-  - `fastapi`
-  - `uvicorn`
-  - `sqlalchemy`
-  - `pydantic`
-  - `apscheduler` or `fastapi-utils`
-
-Install with:
-
-```bash
-pip install fastapi uvicorn sqlalchemy pymysql pydantic apscheduler
-```
+**4. Defining the Workflow and API:**
+The API endpoints were designed to be a clear and simple interface for a client application to interact with the system's state. The detailed workflow, including login, heartbeats, and task completion, maps out the entire lifecycle of a user interaction, providing a complete picture of how the components work together.
 
 ---
 
-## Installation
+## **System Architecture**
 
-1. **Clone the repository**:
+The system is built on a decoupled, three-component architecture to ensure scalability and maintainability.
 
-```bash
-    git clone <repo-url>
-    cd qc\_auto\_assignment
+1.  **FastAPI Application (API Layer)**: The central point of interaction for all clients (e.g., the QC web portal). It exposes a RESTful API to manage user sessions and tasks.
+2.  **MySQL Database (Persistence Layer)**: Acts as the single source of truth for the system's state. It stores all information about personnel, tasks, and assignments.
+3.  **Background Scheduler (Logic Engine)**: An independent process that contains the core assignment logic. It periodically polls the database to match free personnel with pending tasks, operating separately from the API to avoid blocking user requests.
+
 ```
-
-2. **Set up MySQL database** and create a user.
-
-3. **Configure** `DATABASE_URL` in `database.py` (e.g., `mysql+pymysql://user:pass@localhost/qc_db`).
-
-4. **Install dependencies**:
-
-```bash
-    pip install -r requirements.txt
++-----------------+      +-------------------+      +----------------------+
+|  QC Web Portal  | <--> | FastAPI Endpoints  | <--> |    MySQL Database    |
+| (Client)        |      | (app.py)          |      | (State & Persistence)|
++-----------------+      +-------------------+      +----------^-----------+
+                                                               |
+                                                               | Polls & Updates
+                                                               |
+                                                      +--------v----------+
+                                                      | Background        |
+                                                      | Scheduler         |
+                                                      +-------------------+
 ```
 
 ---
 
-## Database Schema
+## **Database Schema**
+
+The database is normalized across three tables to ensure data integrity and prevent redundancy.
 
 ```sql
-CREATE TABLE qc_person (
+-- Stores personnel information and their real-time status.
+CREATE TABLE qc_personnel (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    is_logged_in BOOLEAN DEFAULT FALSE,
-    is_busy BOOLEAN DEFAULT FALSE,
-    last_heartbeat DATETIME
+    name VARCHAR(255) NOT NULL,
+    is_logged_in BOOLEAN NOT NULL DEFAULT FALSE,
+    is_busy BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Tracks the last time the user's client sent a signal.
+    last_heartbeat TIMESTAMP NULL
 );
 
-CREATE TABLE qc_task (
+-- Contains all QC tasks and their current state.
+CREATE TABLE qc_tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    description TEXT NOT NULL,
-    status ENUM('PENDING','IN_PROGRESS','DONE') DEFAULT 'PENDING',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    assigned_person_id INT NULL,
-    FOREIGN KEY (assigned_person_id) REFERENCES qc_person(id)
+    description TEXT,
+    -- PENDING: Waiting for assignment.
+    -- IN_PROGRESS: Assigned to a user.
+    -- COMPLETED: The work is done.
+    status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    assigned_to_id INT NULL,
+    FOREIGN KEY (assigned_to_id) REFERENCES qc_personnel(id) ON DELETE SET NULL
 );
 
-CREATE TABLE assignment (
+-- An audit log of all historical assignments.
+CREATE TABLE qc_assignments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     task_id INT NOT NULL,
     person_id INT NOT NULL,
-    assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME NULL,
-    FOREIGN KEY (task_id) REFERENCES qc_task(id),
-    FOREIGN KEY (person_id) REFERENCES qc_person(id)
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL,
+    FOREIGN KEY (task_id) REFERENCES qc_tasks(id),
+    FOREIGN KEY (person_id) REFERENCES qc_personnel(id)
 );
 ```
 
 ---
 
-## Methodology
+## **System Workflow**
 
-1. **Identify Actors & Data**:
-
-   - QC personnel (`qc_person`) can log in/out and become busy/free.
-   - QC tasks (`qc_task`) move from `PENDING` → `IN_PROGRESS` → `DONE`.
-
-2. **Assignment Logic**:
-
-   - On login, personnel appear as free.
-   - Pending tasks enqueued in the DB.
-   - Scheduler matches free personnel with oldest pending tasks.
-
-3. **Automation**:
-
-   - Use a recurring background job to poll for free personnel and tasks.
-   - Update DB records atomically to avoid race conditions.
-
-4. **API Exposure**:
-
-   - Endpoints for login/logout, task creation, status querying, and task completion.
-
-5. **Validation**:
-
-   - Ensure atomic DB transactions.
-   - Handle edge cases: no free personnel, no pending tasks.
+1.  **Login**: A QC person logs in. The API marks `is_logged_in = TRUE` and sets the initial `last_heartbeat`.
+2.  **Heartbeat**: The client-side portal sends a `heartbeat` request every 30-60 seconds to signal the user is still active. The API updates the `last_heartbeat` timestamp for that user.
+3.  **Task Assignment**: The **Background Scheduler** runs its logic loop (see below). It identifies the logged-in, non-busy user and assigns them the oldest pending task.
+4.  **Task Completion**: After finishing the task, the user submits it. The API marks the task as `COMPLETED`, sets the user's status to `is_busy = FALSE`, and logs the completion time in the `qc_assignments` table.
+5.  **Re-assignment**: The user is now free. In its next cycle, the scheduler will automatically assign them a new pending task.
+6.  **Stale Session Handling**: If a user's `last_heartbeat` is older than a set threshold (e.g., 90 seconds), the scheduler assumes they have disconnected and automatically logs them out by setting `is_logged_in = FALSE` and freeing up any task they had in progress.
 
 ---
 
-## Application Architecture
+## **The Scheduler: Core Assignment Engine**
 
-1. **`app.py`**: Defines FastAPI, includes middleware for CORS, and mounts endpoints.
-2. **`database.py`**: Creates SQLAlchemy Engine, Session, and ORM models.
-3. **`scheduler.py`**: Registers a job (`APScheduler` or FastAPI-Utils `@repeat_every`) to run every 5 seconds:
+The scheduler runs as a persistent background job (e.g., using `APScheduler`). To prevent race conditions in a multi-instance environment, its logic must be atomic.
 
-   - Query `qc_person` where `is_logged_in=True` AND `is_busy=False`.
-   - Query next `qc_task` where `status='PENDING'` (ordered by `created_at`).
-   - Assign: Update both tables and insert into `assignment`.
+**Execution Cycle (runs every 5-10 seconds):**
 
-Diagram:
+1.  **Clean Stale Sessions**:
 
-```
-+-----------+      +-------------+      +-------------+
-| FastAPI   | <--> | MySQL       | <--> | Scheduler   |
-| Endpoints |      | qc_person   |      | (APScheduler)|
-+-----------+      | qc_task     |      +-------------+
-                   | assignment  |
-                   +-------------+
-```
+    - Find all personnel where `is_logged_in = TRUE` but `last_heartbeat` is older than the timeout threshold.
+    - For each stale user, set `is_logged_in = FALSE`, `is_busy = FALSE`, and set the status of any `IN_PROGRESS` task assigned to them back to `PENDING`.
 
----
-
-## API Endpoints
-
-| Method | Path                   | Description                                     |
-| ------ | ---------------------- | ----------------------------------------------- |
-| POST   | `/login`               | Log in a QC person (set `is_logged_in=True`).   |
-| POST   | `/logout`              | Log out a QC person (set `is_logged_in=False`). |
-| POST   | `/tasks/`              | Create a new QC task (status=`PENDING`).        |
-| GET    | `/persons/available`   | List free, logged-in personnel.                 |
-| GET    | `/tasks/pending`       | List tasks with `PENDING` status.               |
-| POST   | `/tasks/{id}/complete` | Mark task `IN_PROGRESS` → `DONE`. Free person.  |
-
-Each endpoint performs input validation and returns JSON responses.
+2.  **Perform Assignments in a Transaction**:
+    - **BEGIN a database transaction.**
+    - Find the next available QC person: `SELECT * FROM qc_personnel WHERE is_logged_in = TRUE AND is_busy = FALSE LIMIT 1 FOR UPDATE;`
+      - Using `FOR UPDATE` locks the selected row, preventing another process from assigning a task to the same person.
+    - If no free person is found, **COMMIT** and end the cycle.
+    - Find the oldest pending task: `SELECT * FROM qc_tasks WHERE status = 'PENDING' ORDER BY created_at LIMIT 1 FOR UPDATE;`
+      - This locks the task row to prevent it from being assigned to someone else.
+    - If no pending task is found, **COMMIT** and end the cycle.
+    - **If both are found**:
+      - Update the person: `SET is_busy = TRUE`.
+      - Update the task: `SET status = 'IN_PROGRESS', assigned_to_id = person.id`.
+      - Create a record in the `qc_assignments` table.
+    - **COMMIT the transaction.** If any step fails, the transaction is rolled back, and no partial changes are saved.
 
 ---
 
-## Scheduler Workflow
+## **API Endpoints**
 
-1. **Interval**: runs every 5 seconds.
-2. **Query Free Personnel**:
-
-   ```python
-   free_ops = session.query(QCPerson)
-       .filter_by(is_logged_in=True, is_busy=False)
-       .all()
-   ```
-
-3. **For each free operator**:
-
-   - Fetch oldest pending task:
-
-     ```python
-     task = session.query(QCTask)
-         .filter_by(status='PENDING')
-         .order_by(QCTask.created_at)
-         .first()
-     ```
-
-   - If `task` exists:
-
-     - `task.status = 'IN_PROGRESS'`
-     - `operator.is_busy = True`
-     - Insert into `assignment` with `assigned_at`
-     - Commit transaction
-
-This ensures tasks are assigned as soon as possible and no operator remains idle when work is waiting.
-
----
-
-## Usage Examples
-
-1. **Start the application**:
-
-   ```bash
-   uvicorn app:app --host 0.0.0.0 --port 8000
-   ```
-
-2. **Login a person**:
-
-   ```bash
-   curl -X POST http://localhost:8000/login -d '{"person_id":1}'
-   ```
-
-3. **Create a task**:
-
-   ```bash
-   curl -X POST http://localhost:8000/tasks/ -d '{"description":"Inspect batch #123"}'
-   ```
-
-4. **Complete a task**:
-
-   ```bash
-   curl -X POST http://localhost:8000/tasks/5/complete
-   ```
-
-5. **Check assignments**:
-
-   ```bash
-   curl http://localhost:8000/persons/available
-   curl http://localhost:8000/tasks/pending
-   ```
-
----
-
-## Extensibility & Production Considerations
-
-- **Distributed Scheduler**: Use Redis locks or Celery beat for multiple instances.
-- **High Availability**: Deploy behind load balancer; configure health checks.
-- **Metrics & Logging**: Integrate Prometheus, structured logs.
-- **Error Handling**: Retries for DB deadlocks, exponential backoff.
-- **Security**: Add authentication (OAuth, JWT), input sanitization.
-
----
+| Method | Path                               | Description                                                       |
+| :----- | :--------------------------------- | :---------------------------------------------------------------- |
+| `POST` | `/personnel/login`                 | Logs a user in by `person_id`. Sets `is_logged_in=TRUE`.          |
+| `POST` | `/personnel/{person_id}/logout`    | Explicitly logs a user out.                                       |
+| `POST` | `/personnel/{person_id}/heartbeat` | Updates the `last_heartbeat` timestamp to keep the session alive. |
+| `POST` | `/tasks`                           | Allows an admin to create a new QC task.                          |
+| `POST` | `/tasks/{task_id}/complete`        | Marks a task as completed and frees up the assigned user.         |
+| `GET`  | `/personnel/status`                | Retrieves the status of all logged-in personnel.                  |
+| `GET`  | `/tasks/queue`                     | Returns a list of all pending and in-progress tasks.              |

@@ -23,11 +23,9 @@ export default function App() {
     number: 1,
   });
 
-  function handleReveal() {
+  const handleReveal = () => {
     const newEntries = puzzle.grid.map((row) =>
-      row.map((cell) =>
-        cell && !cell.isBlack && cell.solution ? cell.solution : ""
-      )
+      row.map((cell) => (cell && !cell.isBlack ? cell.solution : ""))
     );
     setEntries(newEntries);
     setFeedback(
@@ -35,7 +33,7 @@ export default function App() {
         .fill()
         .map(() => Array(puzzle.cols).fill(null))
     );
-  }
+  };
 
   function handleClear() {
     setEntries(
@@ -50,20 +48,19 @@ export default function App() {
     );
   }
 
-  // ------ NEW: handleCheck ------
-  function handleCheck() {
+  const handleCheck = () => {
     const newFeedback = puzzle.grid.map((row, rIdx) =>
       row.map((cell, cIdx) => {
         if (!cell || cell.isBlack || !cell.solution) return null;
-        if (!entries[rIdx][cIdx]) return null; // Not filled yet
-        return entries[rIdx][cIdx].toUpperCase() === cell.solution.toUpperCase()
+        if (!entries[rIdx][cIdx]) return null;
+        return entries[rIdx][cIdx]?.toUpperCase() ===
+          cell.solution.toUpperCase()
           ? "correct"
           : "incorrect";
       })
     );
     setFeedback(newFeedback);
-  }
-  // -----------------------------
+  };
 
   return (
     <div className="app-main">
@@ -92,7 +89,6 @@ export default function App() {
           activeClue={activeClue}
           setActiveClue={setActiveClue}
           setDirection={setDirection}
-          setSelectedCell={setSelectedCell}
         />
       </div>
     </div>
